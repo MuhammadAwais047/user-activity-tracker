@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>trace — activity, on the record</title>
+  <meta name="description" content="trace is a self-instrumenting activity tracker: seeded history plus live events from your own clicks, rendered as KPIs, trends, a rhythm heatmap, and a real-time stream. Vanilla JavaScript, stored locally." />
+  <meta property="og:title" content="trace — activity, on the record" />
+  <meta property="og:description" content="An activity console that watches itself. Live event stream, sessions, heatmap, and event mix — all local." />
+  <meta property="og:type" content="website" />
+  <meta name="theme-color" content="#070b10" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='24' fill='%23070b10'/%3E%3Cpath d='M14 54h14l7-20 12 38 10-29 7 11h22' fill='none' stroke='%235eead4' stroke-width='7' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a class="brand" href="#/overview" aria-label="trace, go to overview">
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 12h3l1.8-4.8L11 17l2.4-7.2L15.2 13H21" />
+          </svg>
+        </span>
+        <span class="brand-word">trace</span>
+        <span class="brand-tag">activity console</span>
+      </a>
+
+      <nav class="tabs" aria-label="Sections">
+        <a class="tab" href="#/overview" data-nav="overview">Overview</a>
+        <a class="tab" href="#/stream" data-nav="stream">Activity</a>
+        <a class="tab" href="#/sessions" data-nav="sessions">Sessions</a>
+        <a class="tab" href="#/settings" data-nav="settings">Settings</a>
+      </nav>
+
+      <div class="topbar-actions">
+        <button id="live-pill" class="live-pill" type="button" aria-label="Tracking status. Open settings to pause or resume." title="Activity is recorded locally in this browser. Open settings to pause.">
+          <span class="live-dot" aria-hidden="true"></span>
+          <span id="live-text">Live</span>
+        </button>
+        <button id="export-top" class="icon-btn" type="button" title="Export selected range as JSON" aria-label="Export selected range as JSON">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M12 3v12" /><path d="m7.5 10.5 4.5 4.5 4.5-4.5" /><path d="M4 17v2.5A1.5 1.5 0 0 0 5.5 21h13a1.5 1.5 0 0 0 1.5-1.5V17" />
+          </svg>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="wrap" id="main">
+    <!-- ============ OVERVIEW ============ -->
+    <section class="page" id="page-overview" data-page="overview">
+      <header class="page-head">
+        <div class="page-copy">
+          <p class="eyebrow"><span class="eyebrow-dot" aria-hidden="true"></span>Overview</p>
+          <h1>Activity, on the record.</h1>
+          <p class="page-sub">This demo watches itself. Every tab, filter, search, and export lands here — stored only in your browser.</p>
+        </div>
+        <div class="range" role="group" aria-label="Date range, overview">
+          <button class="range-btn" type="button" data-range-set="7">7d</button>
+          <button class="range-btn" type="button" data-range-set="14">14d</button>
+          <button class="range-btn" type="button" data-range-set="30">30d</button>
+        </div>
+      </header>
+
+      <section class="kpis" id="kpis" aria-label="Key metrics"></section>
+
+      <div class="overview-grid">
+        <article class="card span-8 trend-card">
+          <header class="card-head">
+            <div>
+              <h2>Activity over time</h2>
+              <p>Events per day across the selected range</p>
+            </div>
+            <span class="card-note" id="trend-total"></span>
+          </header>
+          <div class="chart-wrap" id="trend-wrap">
+            <div class="chart-tip" id="trend-tip" hidden></div>
+            <svg id="trend-chart" role="img" aria-label="Trend chart of daily events"></svg>
+          </div>
+        </article>
+
+        <article class="card span-4">
+          <header class="card-head">
+            <div>
+              <h2>Event mix</h2>
+              <p>What activity is made of</p>
+            </div>
+          </header>
+          <div class="mix">
+            <div id="mix-donut" class="donut-wrap"></div>
+            <div id="mix-legend" class="mix-legend"></div>
+          </div>
+        </article>
+
+        <article class="card span-7">
+          <header class="card-head">
+            <div>
+              <h2>Rhythm</h2>
+              <p>Events by weekday and local hour · last 28 days</p>
+            </div>
+            <span class="card-note" id="heat-peak"></span>
+          </header>
+          <div class="heat-scroll">
+            <div class="heatmap" id="heatmap"></div>
+          </div>
+          <div class="heat-legend">
+            <span>quiet</span>
+            <span class="heat-scale" aria-hidden="true">
+              <i style="--h:0.08"></i><i style="--h:0.22"></i><i style="--h:0.4"></i><i style="--h:0.62"></i><i style="--h:0.86"></i>
+            </span>
+            <span>busy</span>
+          </div>
+        </article>
+
+        <article class="card span-5">
+          <header class="card-head">
+            <div>
+              <h2>Top screens</h2>
+              <p>Where activity clusters</p>
+            </div>
+          </header>
+          <div id="top-screens" class="top-screens"></div>
+        </article>
+
+        <article class="card span-7">
+          <header class="card-head">
+            <div>
+              <h2>Recent activity</h2>
+              <p>The last few things that happened</p>
+            </div>
+            <a class="text-link" href="#/stream">View stream
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14" /><path d="m13 6 6 6-6 6" /></svg>
+            </a>
+          </header>
+          <ul id="recent-list" class="event-list compact"></ul>
+        </article>
+
+        <div class="span-5 side-stack">
+          <article class="card session-card">
+            <header class="card-head">
+              <div>
+                <h2>Current session</h2>
+                <p>This browser, right now</p>
+              </div>
+              <span class="live-tag" id="session-live-tag">live</span>
+            </header>
+            <div class="session-big" id="session-elapsed">00:00</div>
+            <div class="session-meta" id="session-meta"></div>
+          </article>
+
+          <article class="card">
+            <header class="card-head">
+              <div>
+                <h2>Signals</h2>
+                <p>Quick reads from this range</p>
+              </div>
+            </header>
+            <ul id="signals" class="signals-list"></ul>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ STREAM ============ -->
+    <section class="page" id="page-stream" data-page="stream" hidden>
+      <header class="page-head">
+        <div class="page-copy">
+          <p class="eyebrow"><span class="eyebrow-dot" aria-hidden="true"></span>Activity</p>
+          <h1>Every move, in order.</h1>
+          <p class="page-sub">A live log of everything this demo records — newest first. Open any row to inspect the raw event.</p>
+        </div>
+        <div class="range" role="group" aria-label="Date range, activity">
+          <button class="range-btn" type="button" data-range-set="7">7d</button>
+          <button class="range-btn" type="button" data-range-set="14">14d</button>
+          <button class="range-btn" type="button" data-range-set="30">30d</button>
+        </div>
+      </header>
+
+      <article class="card stream-card">
+        <div class="stream-tools">
+          <div class="chips" id="type-chips" role="group" aria-label="Filter by event type"></div>
+          <div class="stream-search">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.6-3.6" /></svg>
+            <label class="sr-only" for="stream-search">Search activity</label>
+            <input id="stream-search" type="search" placeholder="Search labels, screens, types…" autocomplete="off" spellcheck="false" />
+            <button id="stream-clear" class="search-clear" type="button" aria-label="Clear search" hidden>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" /></svg>
+            </button>
+          </div>
+        </div>
+
+        <div class="stream-status">
+          <span id="stream-count" class="stream-count">0 events</span>
+          <button id="session-filter" class="session-pill" type="button" hidden></button>
+          <button id="clear-filters" class="text-btn" type="button" hidden>Clear filters</button>
+          <span class="stream-live"><span class="live-dot" aria-hidden="true"></span><span id="stream-live-text">auto-capturing</span></span>
+        </div>
+
+        <ul id="stream-list" class="event-list"></ul>
+        <div id="stream-empty" class="empty" hidden></div>
+        <div class="load-row">
+          <button id="stream-more" class="btn" type="button" hidden>Load older events</button>
+        </div>
+      </article>
+    </section>
+
+    <!-- ============ SESSIONS ============ -->
+    <section class="page" id="page-sessions" data-page="sessions" hidden>
+      <header class="page-head">
+        <div class="page-copy">
+          <p class="eyebrow"><span class="eyebrow-dot" aria-hidden="true"></span>Sessions</p>
+          <h1>Visits, stitched together.</h1>
+          <p class="page-sub">A session stays open while you keep moving, and closes after 30 minutes of silence. Pick one to replay its events.</p>
+        </div>
+        <div class="range" role="group" aria-label="Date range, sessions">
+          <button class="range-btn" type="button" data-range-set="7">7d</button>
+          <button class="range-btn" type="button" data-range-set="14">14d</button>
+          <button class="range-btn" type="button" data-range-set="30">30d</button>
+        </div>
+      </header>
+
+      <dl class="session-summary" id="session-summary"></dl>
+      <div id="session-list" class="session-groups"></div>
+      <div id="sessions-empty" class="empty" hidden></div>
+      <div class="load-row">
+        <button id="sessions-more" class="btn" type="button" hidden>Load older sessions</button>
+      </div>
+    </section>
+
+    <!-- ============ SETTINGS ============ -->
+    <section class="page" id="page-settings" data-page="settings" hidden>
+      <header class="page-head">
+        <div class="page-copy">
+          <p class="eyebrow"><span class="eyebrow-dot" aria-hidden="true"></span>Settings</p>
+          <h1>Your data, your rules.</h1>
+          <p class="page-sub">Everything trace records stays in this browser's localStorage. No account, no server, no network calls.</p>
+        </div>
+      </header>
+
+      <div class="settings-grid">
+        <article class="card span-6">
+          <header class="card-head">
+            <div>
+              <h2>Tracking</h2>
+              <p>Control the instrumentation layer</p>
+            </div>
+          </header>
+          <div class="setting-row">
+            <div>
+              <h3>Record my activity</h3>
+              <p>Capture tab views, clicks, searches, filters, and exports as local events.</p>
+            </div>
+            <label class="switch">
+              <input id="tracking-toggle" type="checkbox" checked />
+              <span class="switch-track" aria-hidden="true"></span>
+              <span class="sr-only">Record my activity</span>
+            </label>
+          </div>
+          <div class="setting-row">
+            <div>
+              <h3>Session window</h3>
+              <p>A new session starts after 30 minutes of inactivity. Fixed for this demo.</p>
+            </div>
+            <span class="setting-value">30 min</span>
+          </div>
+          <p class="hint" id="tracking-hint">Tracking is on. Interact with the console and watch the stream fill.</p>
+        </article>
+
+        <article class="card span-6">
+          <header class="card-head">
+            <div>
+              <h2>Local data</h2>
+              <p>Stored under <code>trace-data-v1</code></p>
+            </div>
+          </header>
+          <dl class="data-stats" id="data-stats"></dl>
+          <div class="btn-row">
+            <button id="export-settings" class="btn primary" type="button">Export JSON</button>
+            <button id="restore-data" class="btn" type="button">Restore demo data</button>
+            <button id="clear-data" class="btn danger" type="button">Clear all</button>
+          </div>
+          <p class="hint" id="clear-hint">Clearing removes every event and session from this browser. Restoring brings back the seeded 30-day history.</p>
+        </article>
+
+        <article class="card span-12">
+          <header class="card-head">
+            <div>
+              <h2>How trace works</h2>
+              <p>The whole pipeline, in four steps</p>
+            </div>
+          </header>
+          <div class="how-grid">
+            <div class="how-item">
+              <span class="how-num">01</span>
+              <h3>Instrument</h3>
+              <p>One <code>track()</code> call records the type, label, screen, session, and timestamp of an interaction.</p>
+            </div>
+            <div class="how-item">
+              <span class="how-num">02</span>
+              <h3>Persist</h3>
+              <p>Events and sessions are written to localStorage on every capture. Refresh and the history is still there.</p>
+            </div>
+            <div class="how-item">
+              <span class="how-num">03</span>
+              <h3>Aggregate</h3>
+              <p>Ranges, deltas, daily series, hourly buckets, and type mixes are computed on the fly — no analytics SDK.</p>
+            </div>
+            <div class="how-item">
+              <span class="how-num">04</span>
+              <h3>Read</h3>
+              <p>Charts, a rhythm heatmap, session replay, filters, and JSON export turn raw rows into a story.</p>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+  </main>
+
+  <footer class="foot">
+    <div class="foot-inner">
+      <span class="foot-brand">trace</span>
+      <p>An activity console that watches itself. Everything stays in your browser.</p>
+      <p class="foot-links">
+        <a href="https://github.com/MuhammadAwais047/user-activity-tracker" target="_blank" rel="noopener noreferrer">Source</a>
+        <span aria-hidden="true">·</span>
+        <a href="https://github.com/MuhammadAwais047" target="_blank" rel="noopener noreferrer">Muhammad Awais</a>
+      </p>
+    </div>
+  </footer>
+
+  <dialog id="drawer" class="drawer" aria-labelledby="drawer-title">
+    <div class="drawer-inner">
+      <header class="drawer-head">
+        <span id="drawer-type" class="type-badge">Event</span>
+        <button id="drawer-close" class="icon-btn" type="button" aria-label="Close event details">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" /></svg>
+        </button>
+      </header>
+      <h2 id="drawer-title">Event</h2>
+      <p class="drawer-sub" id="drawer-sub"></p>
+      <dl class="drawer-meta" id="drawer-meta"></dl>
+      <div class="drawer-code">
+        <div class="code-head"><span>event payload</span><span>JSON</span></div>
+        <pre id="drawer-json"></pre>
+      </div>
+      <div class="drawer-actions">
+        <button id="drawer-filter" class="btn primary" type="button">Filter stream by type</button>
+        <button id="drawer-session" class="btn ghost" type="button">Replay session</button>
+      </div>
+    </div>
+  </dialog>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <p id="live" class="sr-only" aria-live="polite"></p>
+
+  <script src="app.js"></script>
+</body>
+</html>
